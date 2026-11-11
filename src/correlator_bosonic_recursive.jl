@@ -1,5 +1,20 @@
 using Combinatorics: parity
 
+# Helper function to determine if an operator needs Jordan-Wigner strings
+# C/Cdag operators need JW strings, A/Adag operators do not
+function needs_jordan_wigner(op_name::String)
+  # Check if operator starts with C (but not if it's just "C" followed by other letters that aren't dag/up/dn)
+  if startswith(op_name, "C") || startswith(op_name, "c")
+    return true
+  end
+  # A/Adag operators don't need JW strings
+  if startswith(op_name, "A") || startswith(op_name, "a")
+    return false
+  end
+  # For other operators, fall back to has_fermion_string
+  return false
+end
+
 # correlator(("A", "B", "C", "D"), [(1, 2, 3, 4), (1, 2, 4, 5), ...])
 function correlator_recursive_compact(
   psi, #::MPS,
@@ -191,7 +206,7 @@ function add_operator_fermi(
     jw_next = jw
 
     for i in 0:repeat
-      if has_fermion_string(ops[perm_ind[counter + repeat - i]], s[op_ind])
+      if needs_jordan_wigner(ops[perm_ind[counter + repeat - i]])
         jw_next = jw_next + 1
         op_psi = apply(op("F", s[op_ind]), op_psi) #track if a fermionic operator was applied
       end
@@ -207,7 +222,7 @@ function add_operator_fermi(
 
       # checking for fermion operators and keeping track of anti-commutations
       ferm_sites =
-        Int.(perm_elem[findall(x -> has_fermion_string(x, s[op_ind]), ops)])
+        Int.(perm_elem[findall(x -> needs_jordan_wigner(x), ops)])
       par = 1 - 2 * parity(sortperm(ferm_sites))
 
       C[tuple(perm_elem...)] = par * inner(dag(L), R)
